@@ -47,6 +47,25 @@ namespace :domain do
   end
 end
 
+namespace :certificate do
+  RakeTerraform.define_command_tasks(
+      configuration_name: 'certificate',
+      argument_names: [:deployment_identifier, :domain_name]
+  ) do |t, args|
+    configuration = configuration
+        .for_overrides(domain_name: args.domain_name)
+        .for_scope(
+            {deployment_identifier: args.deployment_identifier}
+                .merge(role: 'certificate'))
+
+    t.source_directory = 'infra/certificate'
+    t.work_directory = 'build'
+
+    t.backend_config = configuration.backend_config
+    t.vars = configuration.vars
+  end
+end
+
 namespace :network do
   RakeTerraform.define_command_tasks(
       configuration_name: 'network',
@@ -87,10 +106,13 @@ end
 namespace :service do
   RakeTerraform.define_command_tasks(
       configuration_name: 'service',
-      argument_names: [:deployment_identifier]
+      argument_names: [:deployment_identifier, :domain_name]
   ) do |t, args|
     configuration = configuration
-        .for_scope(args.to_h.merge(role: 'service'))
+        .for_overrides(domain_name: args.domain_name)
+        .for_scope(
+            {deployment_identifier: args.deployment_identifier}
+                .merge(role: 'service'))
 
     t.source_directory = 'infra/service'
     t.work_directory = 'build'
