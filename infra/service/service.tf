@@ -1,17 +1,15 @@
-data "template_file" "prometheus_task_container_definitions" {
-  template = file("${path.root}/container-definitions/prometheus.json.tpl")
-
-  vars = {
-    env_file_object_path = data.template_file.env_file_object_path.rendered
+locals {
+  prometheus_task_container_definitions = templatefile("${path.root}/container-definitions/prometheus.json.tpl", {
+    env_file_object_path = local.env_file_object_path
     container_port = var.prometheus_service_container_port
     host_port = var.prometheus_service_host_port
     storage_location = var.prometheus_storage_location
-  }
+  })
 }
 
 module "prometheus_service" {
   source  = "infrablocks/ecs-service/aws"
-  version = "2.4.0"
+  version = "4.2.0-rc.8"
 
   component = var.component
   deployment_identifier = var.deployment_identifier
@@ -19,7 +17,7 @@ module "prometheus_service" {
   region = var.region
   vpc_id = data.aws_vpc.vpc.id
 
-  service_task_container_definitions = data.template_file.prometheus_task_container_definitions.rendered
+  service_task_container_definitions = local.prometheus_task_container_definitions
 
   service_name = var.component
   service_image = var.prometheus_image
@@ -29,7 +27,7 @@ module "prometheus_service" {
   service_deployment_maximum_percent = 200
   service_deployment_minimum_healthy_percent = 50
 
-  service_elb_name = module.prometheus_load_balancer.name
+  target_group_arn = module.prometheus_load_balancer.target_groups["default"].arn
 
   service_volumes = [
     {

@@ -1,65 +1,31 @@
 locals {
+  prometheus_dns_name = "${var.component}-${var.deployment_identifier}.${data.terraform_remote_state.domain.outputs.domain_name}"
+
   env_file_object_key = "prometheus/service/environments/default.env"
-  configuration_file_object_path = "prometheus/service/configuration/prometheus.yml"
+  env_file_object_path = "s3://${var.secrets_bucket_name}/${local.env_file_object_key}"
+
+  configuration_file_object_key = "prometheus/service/configuration/prometheus.yml"
+  configuration_file_object_path = "s3://${var.secrets_bucket_name}/${local.configuration_file_object_key}"
+
+  env = templatefile("${path.root}/envfiles/prometheus.env.tpl", {
+    prometheus_dns_name = local.prometheus_dns_name
+    prometheus_configuration_file_object_path = local.configuration_file_object_path
+  })
+  configuration = templatefile("${path.root}/configuration/prometheus.yml.tpl", {})
 }
 
-data "template_file" "prometheus_dns_name" {
-  template = "$${component}-$${deployment_identifier}.$${domain}"
-
-  vars = {
-    component = var.component
-    deployment_identifier = var.deployment_identifier
-    domain = data.terraform_remote_state.domain.outputs.domain_name
-  }
-}
-
-data "template_file" "env_file_object_path" {
-  template = "s3://$${secrets_bucket}/$${environment_object_key}"
-
-  vars = {
-    secrets_bucket = var.secrets_bucket_name
-    environment_object_key = local.env_file_object_key
-  }
-}
-
-data "template_file" "configuration_file_object_path" {
-  template = "s3://$${secrets_bucket}/$${configuration_file_object_path}"
-
-  vars = {
-    secrets_bucket = var.secrets_bucket_name
-    configuration_file_object_path = local.configuration_file_object_path
-  }
-}
-
-data "template_file" "env" {
-  template = file("${path.root}/envfiles/prometheus.env.tpl")
-
-  vars = {
-    prometheus_dns_name = data.template_file.prometheus_dns_name.rendered
-    prometheus_configuration_file_object_path = data.template_file.configuration_file_object_path.rendered
-  }
-}
-
-data "template_file" "configuration" {
-  template = file("${path.root}/configuration/prometheus.yml.tpl")
-
-  vars = {
-
-  }
-}
-
-resource "aws_s3_bucket_object" "env" {
+resource "aws_s3_object" "env" {
   key = local.env_file_object_key
   bucket = var.secrets_bucket_name
-  content = data.template_file.env.rendered
+  content = local.env
 
   server_side_encryption = "AES256"
 }
 
-resource "aws_s3_bucket_object" "configuration" {
-  key = local.configuration_file_object_path
+resource "aws_s3_object" "configuration" {
+  key = local.configuration_file_object_key
   bucket = var.secrets_bucket_name
-  content = data.template_file.configuration.rendered
+  content = local.configuration
 
   server_side_encryption = "AES256"
 }
